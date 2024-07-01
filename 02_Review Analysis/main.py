@@ -1,35 +1,31 @@
+from sklearn.feature_extraction.text import TfidfVectorizer
 import pandas as pd
+import requests
 import tensorflow as tf
-from transformers import BertTokenizer, TFBertForSequenceClassification
+import tensorflow_text as tf_text
 from sklearn.model_selection import train_test_split
-import numpy as np
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import classification_report
 
+vectorizer = TfidfVectorizer()
 df = pd.read_csv("movie_reviews.csv")
+tokenizer = tf_text.WhitespaceTokenizer()
+tokens = tokenizer.tokenize(df['review'])
 
-review = df['review'].tolist()
-sentiment = df['sentiment'].tolist()
+vectorizer = TfidfVectorizer(max_features=5000)
+X = vectorizer.fit_transform(df['review'])
+y = df['sentiment']
 
-train_texts, val_texts, train_labels, val_labels = train_test_split(review, sentiment, test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-model = TFBertForSequenceClassification.from_pretrained('bert-base-uncased')
-tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-inputs = tokenizer(review, return_tensors='tf', padding=True, truncation=True, max_length=128)
-train_inputs, val_inputs, train_labels, val_labels = train_test_split(
-    inputs['input_ids'], sentiment, test_size=0.2, random_state=42)
+model = MultinomialNB()
+model.fit(X_train, y_train)
 
-# Compilar y entrenar el modelo
-model.compile(optimizer='adam',
-              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-              metrics=['accuracy'])
+y_pred = model.predict(X_test)
+print(classification_report(y_test, y_pred))
 
-history = model.fit(
-    train_inputs,
-    np.array(train_labels),
-    validation_data=(val_inputs, np.array(val_labels)),
-    epochs=3,
-    batch_size=32
-)
-
-# Evaluar el modelo
-test_loss, test_acc = model.evaluate(val_inputs, np.array(val_labels), verbose=2)
-print(f'Test accuracy: {test_acc}')
+# Ejemplos de predicciones
+ejemplos = ["This film is great!", "I did not like this movie at all."]
+ejemplos_features = vectorizer.transform(ejemplos)
+predicciones = model.predict(ejemplos_features)
+print(predicciones)
